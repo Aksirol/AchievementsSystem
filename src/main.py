@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt
 from auth import create_default_admin, Session, logout
 from login_window import LoginDialog
 from admin_users import UserManagementWidget
+from students_module import StudentsPanel
 
 
 class MainWindow(QMainWindow):
@@ -35,30 +36,30 @@ class MainWindow(QMainWindow):
         self.setup_ui_for_role()
 
     def setup_ui_for_role(self):
-        """Налаштовує інтерфейс залежно від ролі користувача (Приховування/відображення)."""
+        """Налаштовує інтерфейс залежно від ролі користувача."""
         role = Session.current_user['role']
         username = Session.current_user['username']
         self.user_info_label.setText(f"Користувач: {username} | Роль: {role}")
 
-        # Екран-заглушка для всіх
-        welcome_label = QLabel(f"Вітаємо в системі! Ваш рівень доступу дозволяє працювати як {role}.")
-        welcome_label.setAlignment(Qt.AlignCenter)
-        self.stack.addWidget(welcome_label)
-
-        # Логіка ролей: додаємо специфічні віджети
         if role == "Адміністратор":
+            # Додаємо дві панелі: керування користувачами та керування учнями
             self.admin_panel = UserManagementWidget()
+            self.students_panel = StudentsPanel()
+
+            # Для простоти поки що показуємо панель учнів як основну для перевірки
             self.stack.addWidget(self.admin_panel)
-            self.stack.setCurrentWidget(self.admin_panel)
-        elif role == "Вчитель / Куратор":
-            # Тут буде панель вчителя (Фаза 3)
-            pass
-        elif role == "Класний керівник":
-            # Тут буде панель класного керівника
-            pass
+            self.stack.addWidget(self.students_panel)
+            self.stack.setCurrentWidget(self.students_panel)
+
+        elif role in ["Вчитель / Куратор", "Класний керівник"]:
+            self.students_panel = StudentsPanel()
+            self.stack.addWidget(self.students_panel)
+            self.stack.setCurrentWidget(self.students_panel)
+
         elif role == "Учень / Батьки":
-            # Тут буде панель учня (тільки читання)
-            pass
+            welcome_label = QLabel("Режим перегляду портфоліо учня (в розробці).")
+            welcome_label.setAlignment(Qt.AlignCenter)
+            self.stack.addWidget(welcome_label)
 
     def handle_logout(self):
         """Механізм виходу та блокування сесії."""
