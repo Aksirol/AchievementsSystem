@@ -6,6 +6,7 @@ from auth import create_default_admin, Session, logout
 from login_window import LoginDialog
 from admin_users import UserManagementWidget
 from students_module import StudentsPanel
+from events_module import AchievementsPanel
 
 
 class MainWindow(QMainWindow):
@@ -42,19 +43,22 @@ class MainWindow(QMainWindow):
         self.user_info_label.setText(f"Користувач: {username} | Роль: {role}")
 
         if role == "Адміністратор":
-            # Додаємо дві панелі: керування користувачами та керування учнями
             self.admin_panel = UserManagementWidget()
             self.students_panel = StudentsPanel()
+            self.achievements_panel = AchievementsPanel()  # Додаємо нову панель
 
-            # Для простоти поки що показуємо панель учнів як основну для перевірки
             self.stack.addWidget(self.admin_panel)
             self.stack.addWidget(self.students_panel)
-            self.stack.setCurrentWidget(self.students_panel)
+            self.stack.addWidget(self.achievements_panel)
+
+            # Відображаємо панель досягнень за замовчуванням для тестування
+            self.stack.setCurrentWidget(self.achievements_panel)
 
         elif role in ["Вчитель / Куратор", "Класний керівник"]:
             self.students_panel = StudentsPanel()
             self.stack.addWidget(self.students_panel)
             self.stack.setCurrentWidget(self.students_panel)
+            self.achievements_panel = AchievementsPanel()
 
         elif role == "Учень / Батьки":
             welcome_label = QLabel("Режим перегляду портфоліо учня (в розробці).")
