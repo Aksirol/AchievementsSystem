@@ -7,6 +7,7 @@ from login_window import LoginDialog
 from admin_users import UserManagementWidget
 from students_module import StudentsPanel
 from events_module import AchievementsPanel
+from clubs_module import ClubsPanel
 
 
 class MainWindow(QMainWindow):
@@ -45,18 +46,21 @@ class MainWindow(QMainWindow):
         if role == "Адміністратор":
             self.admin_panel = UserManagementWidget()
             self.students_panel = StudentsPanel()
-            self.achievements_panel = AchievementsPanel()  # Додаємо нову панель
+            self.achievements_panel = AchievementsPanel()
+            self.clubs_panel = ClubsPanel()  # Додаємо панель гуртків
 
             self.stack.addWidget(self.admin_panel)
             self.stack.addWidget(self.students_panel)
             self.stack.addWidget(self.achievements_panel)
+            self.stack.addWidget(self.clubs_panel)
 
-            # Відображаємо панель досягнень за замовчуванням для тестування
-            self.stack.setCurrentWidget(self.achievements_panel)
+            # Тестуємо панель гуртків
+            self.stack.setCurrentWidget(self.clubs_panel)
 
         elif role in ["Вчитель / Куратор", "Класний керівник"]:
             self.students_panel = StudentsPanel()
             self.stack.addWidget(self.students_panel)
+            self.clubs_panel = ClubsPanel()
             self.stack.setCurrentWidget(self.students_panel)
             self.achievements_panel = AchievementsPanel()
 
