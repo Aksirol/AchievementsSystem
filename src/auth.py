@@ -1,9 +1,21 @@
 import sqlite3
 import bcrypt
 import os
+import sys
 
-# Шлях до БД
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'achievements.db'))
+# Визначаємо корінь проекту залежно від того, як запущена програма
+if getattr(sys, 'frozen', False):
+    # Якщо запущено як зібраний .exe файл
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # Якщо запущено як звичайний Python-скрипт в IDE
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+# Абсолютний шлях до бази даних
+DB_PATH = os.path.join(BASE_DIR, 'data', 'achievements.db')
+
+# Створюємо папку data/documents поруч з .exe (якщо її раптом немає)
+os.makedirs(os.path.join(BASE_DIR, 'data', 'documents'), exist_ok=True)
 
 class Session:
     """Клас для зберігання даних поточного авторизованого користувача"""

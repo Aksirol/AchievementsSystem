@@ -16,7 +16,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # Реєстрація кириличного шрифту (переконайтеся, що файл fonts/arial.ttf існує)
-FONT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'fonts', 'arial.ttf'))
+FONT_PATH = os.path.join(auth.BASE_DIR, 'fonts', 'arial.ttf')
 try:
     pdfmetrics.registerFont(TTFont('Arial', FONT_PATH))
     BASE_FONT = 'Arial'

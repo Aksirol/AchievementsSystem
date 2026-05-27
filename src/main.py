@@ -10,6 +10,7 @@ from students_module import StudentsPanel
 from events_module import AchievementsPanel
 from clubs_module import ClubsPanel
 from reports_module import ReportsPanel
+from backup_module import BackupPanel
 
 
 class MainWindow(QMainWindow):
@@ -66,6 +67,7 @@ class MainWindow(QMainWindow):
             self.add_panel("🏆 Заходи та Досягнення", AchievementsPanel())
             self.add_panel("⚽ Гуртки та Секції", ClubsPanel())
             self.add_panel("📊 Звіти та Характеристики", ReportsPanel())
+            self.add_panel("💾 Резервне копіювання", BackupPanel()) 
 
         elif role in ["Вчитель / Куратор", "Класний керівник"]:
             self.add_panel("🎓 Учні та Класи", StudentsPanel())
