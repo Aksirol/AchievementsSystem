@@ -121,12 +121,12 @@ class AchievementDialog(QDialog):
                     QMessageBox.warning(self, "Увага", "Цей учень вже має зареєстроване досягнення на даному заході!")
                     return
 
-            # TC-4.3: Копіювання файлу
+            # TC-4.3: Копіювання файлу з використанням auth.BASE_DIR
             saved_file_name = None
             if self.file_path:
                 ext = os.path.splitext(self.file_path)[1]
                 saved_file_name = f"doc_{student_id}_{event_id}_{int(datetime.now().timestamp())}{ext}"
-                dest_path = os.path.join('data', 'documents', saved_file_name)
+                dest_path = os.path.join(auth.BASE_DIR, 'data', 'documents', saved_file_name)
                 os.makedirs(os.path.dirname(dest_path), exist_ok=True)
                 shutil.copy(self.file_path, dest_path)
 
@@ -218,7 +218,7 @@ class AchievementsPanel(QWidget):
 
         doc_path = self.table.item(row, 6).data(Qt.UserRole)
         if doc_path:
-            full_path = os.path.abspath(os.path.join('data', 'documents', doc_path))
+            full_path = os.path.abspath(os.path.join(auth.BASE_DIR, 'data', 'documents', doc_path))
             if os.path.exists(full_path):
                 # Відкриття файлу стандартною програмою ОС (TC-4.4)
                 if platform.system() == 'Windows':
@@ -250,7 +250,7 @@ class AchievementsPanel(QWidget):
                 conn.commit()
 
             if doc_path:
-                full_path = os.path.join('data', 'documents', doc_path)
+                full_path = os.path.join(auth.BASE_DIR, 'data', 'documents', doc_path)
                 if os.path.exists(full_path):
                     os.remove(full_path)
 

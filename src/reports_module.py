@@ -7,7 +7,6 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt
 import auth
 
-# Імпорти для ReportLab
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -15,13 +14,20 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# Реєстрація кириличного шрифту (переконайтеся, що файл fonts/arial.ttf існує)
-FONT_PATH = os.path.join(auth.BASE_DIR, 'fonts', 'arial.ttf')
+# КРИТ-1: Надійний пошук шрифтів (з підтримкою Debian)
+PROJECT_FONT_PATH = os.path.join(auth.BASE_DIR, 'fonts', 'arial.ttf')
+DEBIAN_FONT_PATH = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+
 try:
-    pdfmetrics.registerFont(TTFont('Arial', FONT_PATH))
-    BASE_FONT = 'Arial'
-except Exception:
-    print("Увага: Шрифт arial.ttf не знайдено. Кирилиця може не відображатись у PDF.")
+    if os.path.exists(PROJECT_FONT_PATH):
+        pdfmetrics.registerFont(TTFont('CyrillicFont', PROJECT_FONT_PATH))
+    elif os.path.exists(DEBIAN_FONT_PATH):
+        pdfmetrics.registerFont(TTFont('CyrillicFont', DEBIAN_FONT_PATH))
+    else:
+        raise FileNotFoundError("Жодного шрифту з підтримкою кирилиці не знайдено.")
+    BASE_FONT = 'CyrillicFont'
+except Exception as e:
+    print(f"Увага: {e} Кирилиця не відображатиметься у PDF.")
     BASE_FONT = 'Helvetica'
 
 
@@ -35,6 +41,9 @@ class ReportsPanel(QWidget):
 
         self.init_class_tab()
         self.init_student_tab()
+
+        # ДОДАЙ ОСЬ ЦЕЙ РЯДОК СЮДИ:
+        self.load_filters()
 
     def init_class_tab(self):
         """Вкладка 1: Рейтинг та Звіт класу"""
@@ -67,7 +76,6 @@ class ReportsPanel(QWidget):
         layout.addWidget(self.export_class_btn)
 
         self.tabs.addTab(tab, "Звіт та Рейтинг класу")
-        self.load_filters()
 
     def init_student_tab(self):
         """Вкладка 2: Характеристика учня"""

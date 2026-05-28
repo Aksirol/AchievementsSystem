@@ -1,8 +1,8 @@
 import sqlite3
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QLineEdit, QFormLayout,
-                             QMessageBox, QComboBox, QDialog, QCheckBox, QHeaderView, QLabel, QInputDialog)
-from PyQt5.QtCore import Qt
+                             QMessageBox, QComboBox, QDialog, QCheckBox, QHeaderView, QLabel, QInputDialog, QDateEdit)
+from PyQt5.QtCore import Qt, QDate
 import auth
 
 
@@ -58,6 +58,50 @@ class ClassDialog(QDialog):
             conn.commit()
         self.accept()
 
+
+# --- Діалог Навчального року (Виправлення КРИТ-3) ---
+class AcademicYearDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Додати навчальний рік")
+        self.layout = QFormLayout(self)
+
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Напр. 2026-2027")
+
+        # Динамічне підставлення поточного року
+        current_year = QDate.currentDate().year()
+
+        self.start_date = QDateEdit()
+        self.start_date.setDate(QDate(current_year, 9, 1))
+        self.start_date.setCalendarPopup(True)
+
+        self.end_date = QDateEdit()
+        self.end_date.setDate(QDate(current_year + 1, 5, 31))
+        self.end_date.setCalendarPopup(True)
+
+        self.layout.addRow("Назва року:", self.name_input)
+        self.layout.addRow("Дата початку:", self.start_date)
+        self.layout.addRow("Дата закінчення:", self.end_date)
+
+        self.save_btn = QPushButton("Зберегти")
+        self.save_btn.clicked.connect(self.save_data)
+        self.layout.addRow(self.save_btn)
+
+    def save_data(self):
+        name = self.name_input.text().strip()
+        start = self.start_date.date().toString("yyyy-MM-dd")
+        end = self.end_date.date().toString("yyyy-MM-dd")
+
+        if not name:
+            QMessageBox.warning(self, "Помилка", "Введіть назву навчального року.")
+            return
+
+        with sqlite3.connect(auth.DB_PATH) as conn:
+            conn.execute("INSERT INTO ACADEMIC_YEARS (name, start_date, end_date) VALUES (?, ?, ?)",
+                         (name, start, end))
+            conn.commit()
+        self.accept()
 
 # --- Діалог Додавання/Редагування Учня ---
 class StudentDialog(QDialog):
@@ -185,13 +229,8 @@ class StudentsPanel(QWidget):
         self.load_students()
 
     def add_academic_year(self):
-        name, ok = QInputDialog.getText(self, "Навчальний рік", "Введіть назву (напр. 2025-2026):")
-        if ok and name:
-            with sqlite3.connect(auth.DB_PATH) as conn:
-                conn.execute(
-                    "INSERT INTO ACADEMIC_YEARS (name, start_date, end_date) VALUES (?, '2025-09-01', '2026-05-31')",
-                    (name,))
-                conn.commit()
+        dialog = AcademicYearDialog(self)
+        if dialog.exec_():
             QMessageBox.information(self, "Успіх", "Навчальний рік додано!")
 
     def add_class(self):

@@ -74,8 +74,8 @@ class BackupPanel(QWidget):
         try:
             # Зберігаємо вміст папки data у zip-архів
             base_name = path.replace('.zip', '')
-            # base_dir='data' зберігає структуру папки в архіві
-            shutil.make_archive(base_name, 'zip', root_dir='.', base_dir='data')
+            # base_dir='data' бере папку data відносно root_dir
+            shutil.make_archive(base_name, 'zip', root_dir=auth.BASE_DIR, base_dir='data')
 
             self.log_operation(path, "Створення копії")
             QMessageBox.information(self, "Успіх", f"Резервну копію успішно створено:\n{path}")
@@ -93,9 +93,9 @@ class BackupPanel(QWidget):
 
         if reply == QMessageBox.Yes:
             try:
-                # Розпакування архіву (він містить папку data)
+                # Розпаковуємо у корінь проекту
                 with zipfile.ZipFile(path, 'r') as zip_ref:
-                    zip_ref.extractall('.')  # Розпаковуємо в корінь проекту
+                    zip_ref.extractall(auth.BASE_DIR)
 
                 # Запис у відновлену БД
                 self.log_operation(path, "Відновлення з копії")
