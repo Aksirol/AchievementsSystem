@@ -21,27 +21,34 @@ class EventDialog(QDialog):
 
         self.name_input = QLineEdit()
         self.type_combo = QComboBox()
+        self.subject_combo = QComboBox()
         self.level_combo = QComboBox()
         self.level_combo.addItems(["Шкільний", "Районний", "Міський", "Обласний", "Всеукраїнський", "Міжнародний"])
 
-        self.load_types()
+        self.load_relations()
 
         self.layout.addRow("Назва заходу:", self.name_input)
         self.layout.addRow("Тип заходу:", self.type_combo)
+        self.layout.addRow("Предмет (необов'язково):", self.subject_combo)
         self.layout.addRow("Рівень:", self.level_combo)
 
         self.save_btn = QPushButton("Зберегти")
         self.save_btn.clicked.connect(self.save_data)
         self.layout.addRow(self.save_btn)
 
-    def load_types(self):
+    def load_relations(self):
         with sqlite3.connect(auth.DB_PATH) as conn:
             for row in conn.execute("SELECT id, name FROM EVENT_TYPES"):
                 self.type_combo.addItem(row[1], row[0])
 
+            self.subject_combo.addItem("Немає", None)  # Для заходів, що не стосуються конкретного предмету
+            for row in conn.execute("SELECT id, name FROM SUBJECTS"):
+                self.subject_combo.addItem(row[1], row[0])
+
     def save_data(self):
         name = self.name_input.text().strip()
         type_id = self.type_combo.currentData()
+        subject_id = self.subject_combo.currentData() # <--- Отримуємо вибраний предмет
         level = self.level_combo.currentText()
 
         if not name or not type_id:
@@ -49,8 +56,9 @@ class EventDialog(QDialog):
             return
 
         with sqlite3.connect(auth.DB_PATH) as conn:
-            conn.execute("INSERT INTO EVENTS (name, event_type_id, level) VALUES (?, ?, ?)",
-                         (name, type_id, level))
+            # Оновлений SQL-запит з subject_id
+            conn.execute("INSERT INTO EVENTS (name, event_type_id, subject_id, level) VALUES (?, ?, ?, ?)",
+                         (name, type_id, subject_id, level))
             conn.commit()
         self.accept()
 

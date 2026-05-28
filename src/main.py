@@ -11,6 +11,7 @@ from events_module import AchievementsPanel
 from clubs_module import ClubsPanel
 from reports_module import ReportsPanel
 from backup_module import BackupPanel
+from directories_module import DirectoriesPanel
 
 
 class MainWindow(QMainWindow):
@@ -63,6 +64,7 @@ class MainWindow(QMainWindow):
         # Динамічне заповнення меню залежно від прав доступу
         if role == "Адміністратор":
             self.add_panel("👥 Користувачі", UserManagementWidget())
+            self.add_panel("📁 Довідники (Вчителі, Предмети)", DirectoriesPanel())
             self.add_panel("🎓 Учні та Класи", StudentsPanel())
             self.add_panel("🏆 Заходи та Досягнення", AchievementsPanel())
             self.add_panel("⚽ Гуртки та Секції", ClubsPanel())
