@@ -69,19 +69,23 @@ class MainWindow(QMainWindow):
             self.add_panel("🎓 Учні та Класи", StudentsPanel())
             self.add_panel("🏆 Заходи та Досягнення", AchievementsPanel())
             self.add_panel("⚽ Гуртки та Секції", ClubsPanel())
-            self.add_panel("📂 Портфоліо учня", PortfolioPanel()) # <--- Додано
+            self.add_panel("📂 Портфоліо учня", PortfolioPanel())
             self.add_panel("📊 Звіти та Характеристики", ReportsPanel())
             self.add_panel("💾 Резервне копіювання", BackupPanel())
 
-        elif role in ["Вчитель / Куратор", "Класний керівник"]:
-            self.add_panel("🎓 Учні та Класи", StudentsPanel())
+        elif role == "Вчитель / Куратор":
+            # Вчитель вносить досягнення та керує гуртками
             self.add_panel("🏆 Заходи та Досягнення", AchievementsPanel())
             self.add_panel("⚽ Гуртки та Секції", ClubsPanel())
-            self.add_panel("📂 Портфоліо учня", PortfolioPanel()) # <--- Додано
+            self.add_panel("📂 Портфоліо учня", PortfolioPanel())
+
+        elif role == "Класний керівник":
+            # Класний керівник керує учнями, формує звіти та характеристики
+            self.add_panel("🎓 Учні та Класи", StudentsPanel())
+            self.add_panel("📂 Портфоліо учня", PortfolioPanel())
             self.add_panel("📊 Звіти та Характеристики", ReportsPanel())
 
         elif role == "Учень / Батьки":
-            # Тут тепер працює повноцінна панель без можливості редагування
             self.add_panel("📂 Моє Портфоліо", PortfolioPanel())
 
         # Вибираємо перший пункт меню за замовчуванням

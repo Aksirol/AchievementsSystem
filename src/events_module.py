@@ -6,17 +6,18 @@ import subprocess
 from datetime import datetime
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QFormLayout, QComboBox,
-                             QMessageBox, QDialog, QLineEdit, QFileDialog, QHeaderView, QLabel, QInputDialog)
-from PyQt5.QtCore import Qt
+                             QMessageBox, QDialog, QLineEdit, QFileDialog, QHeaderView, QLabel, QInputDialog,
+                             QDateEdit)
+from PyQt5.QtCore import Qt, QDate
 import auth
 
 
 # --- Діалог Додавання Заходу ---
 class EventDialog(QDialog):
-    # ... (Код залишається без змін)
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Новий захід")
+        self.setMinimumWidth(400)
         self.layout = QFormLayout(self)
 
         self.name_input = QLineEdit()
@@ -25,12 +26,24 @@ class EventDialog(QDialog):
         self.level_combo = QComboBox()
         self.level_combo.addItems(["Шкільний", "Районний", "Міський", "Обласний", "Всеукраїнський", "Міжнародний"])
 
+        # Відсутні поля (ТЗ)
+        self.event_date = QDateEdit()
+        self.event_date.setCalendarPopup(True)
+        self.event_date.setDate(QDate.currentDate())
+        self.organizer_input = QLineEdit()
+        self.location_input = QLineEdit()
+        self.year_combo = QComboBox()
+
         self.load_relations()
 
         self.layout.addRow("Назва заходу:", self.name_input)
         self.layout.addRow("Тип заходу:", self.type_combo)
         self.layout.addRow("Предмет (необов'язково):", self.subject_combo)
         self.layout.addRow("Рівень:", self.level_combo)
+        self.layout.addRow("Дата проведення:", self.event_date)
+        self.layout.addRow("Організатор:", self.organizer_input)
+        self.layout.addRow("Місце проведення:", self.location_input)
+        self.layout.addRow("Навчальний рік:", self.year_combo)
 
         self.save_btn = QPushButton("Зберегти")
         self.save_btn.clicked.connect(self.save_data)
@@ -41,31 +54,39 @@ class EventDialog(QDialog):
             for row in conn.execute("SELECT id, name FROM EVENT_TYPES"):
                 self.type_combo.addItem(row[1], row[0])
 
-            self.subject_combo.addItem("Немає", None)  # Для заходів, що не стосуються конкретного предмету
+            self.subject_combo.addItem("Немає", None)
             for row in conn.execute("SELECT id, name FROM SUBJECTS"):
                 self.subject_combo.addItem(row[1], row[0])
+
+            self.year_combo.addItem("Не обрано", None)
+            for row in conn.execute("SELECT id, name FROM ACADEMIC_YEARS"):
+                self.year_combo.addItem(row[1], row[0])
 
     def save_data(self):
         name = self.name_input.text().strip()
         type_id = self.type_combo.currentData()
-        subject_id = self.subject_combo.currentData() # <--- Отримуємо вибраний предмет
+        subject_id = self.subject_combo.currentData()
         level = self.level_combo.currentText()
+        date_val = self.event_date.date().toString("yyyy-MM-dd")
+        org = self.organizer_input.text().strip()
+        loc = self.location_input.text().strip()
+        year_id = self.year_combo.currentData()
 
         if not name or not type_id:
             QMessageBox.warning(self, "Помилка", "Заповніть назву та оберіть тип заходу.")
             return
 
         with sqlite3.connect(auth.DB_PATH) as conn:
-            # Оновлений SQL-запит з subject_id
-            conn.execute("INSERT INTO EVENTS (name, event_type_id, subject_id, level) VALUES (?, ?, ?, ?)",
-                         (name, type_id, subject_id, level))
+            conn.execute("""INSERT INTO EVENTS 
+                            (name, event_type_id, subject_id, level, event_date, organizer, location, academic_year_id) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                         (name, type_id, subject_id, level, date_val, org, loc, year_id))
             conn.commit()
         self.accept()
 
 
 # --- Діалог Досягнення Учня ---
 class AchievementDialog(QDialog):
-    # ... (Код залишається без змін)
     def __init__(self, parent=None, achievement_id=None):
         super().__init__(parent)
         self.achievement_id = achievement_id
@@ -80,6 +101,9 @@ class AchievementDialog(QDialog):
         self.diploma_combo = QComboBox()
         self.diploma_combo.addItems(["Учасник", "Лауреат", "Переможець"])
 
+        self.note_input = QLineEdit()  # Нове поле
+        self.note_input.setPlaceholderText("Додаткові примітки...")
+
         self.file_path = None
         self.file_btn = QPushButton("Обрати скан-копію...")
         self.file_btn.clicked.connect(self.select_file)
@@ -91,6 +115,7 @@ class AchievementDialog(QDialog):
         self.layout.addRow("Захід:", self.event_combo)
         self.layout.addRow("Місце:", self.place_combo)
         self.layout.addRow("Тип диплому:", self.diploma_combo)
+        self.layout.addRow("Примітка:", self.note_input)
         self.layout.addRow(self.file_btn, self.file_label)
 
         self.save_btn = QPushButton("Зберегти досягнення")
@@ -116,12 +141,11 @@ class AchievementDialog(QDialog):
         place = self.place_combo.currentText()
         place_val = int(place) if place.isdigit() else None
         diploma = self.diploma_combo.currentText()
+        note = self.note_input.text().strip()
         user_id = auth.Session.current_user['id']
 
         with sqlite3.connect(auth.DB_PATH) as conn:
             cur = conn.cursor()
-
-            # TC-4.5: Перевірка на дублікати
             if not self.achievement_id:
                 cur.execute("SELECT COUNT(*) FROM ACHIEVEMENTS WHERE student_id=? AND event_id=?",
                             (student_id, event_id))
@@ -129,7 +153,6 @@ class AchievementDialog(QDialog):
                     QMessageBox.warning(self, "Увага", "Цей учень вже має зареєстроване досягнення на даному заході!")
                     return
 
-            # TC-4.3: Копіювання файлу з використанням auth.BASE_DIR
             saved_file_name = None
             if self.file_path:
                 ext = os.path.splitext(self.file_path)[1]
@@ -139,9 +162,13 @@ class AchievementDialog(QDialog):
                 shutil.copy(self.file_path, dest_path)
 
             cur.execute("""INSERT INTO ACHIEVEMENTS 
-                           (student_id, event_id, confirmed_by, place, diploma_type, document_path) 
-                           VALUES (?, ?, ?, ?, ?, ?)""",
-                        (student_id, event_id, user_id, place_val, diploma, saved_file_name))
+                           (student_id, event_id, confirmed_by, place, diploma_type, note, document_path) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (student_id, event_id, user_id, place_val, diploma, note, saved_file_name))
+
+            # Логування дій (вирішує зауваження про аудит із Синьої зони)
+            cur.execute("INSERT INTO BACKUP_LOG (file_path, created_by, status) VALUES (?, ?, ?)",
+                        (f"Досягнення учня ID:{student_id} на заході ID:{event_id}", user_id, "Внесення досягнення"))
             conn.commit()
         self.accept()
 

@@ -104,23 +104,37 @@ class AcademicYearDialog(QDialog):
         self.accept()
 
 # --- Діалог Додавання/Редагування Учня ---
+# --- Діалог Додавання/Редагування Учня ---
 class StudentDialog(QDialog):
     def __init__(self, student_id=None, parent=None):
         super().__init__(parent)
         self.student_id = student_id
         self.setWindowTitle("Картка учня")
-        self.setMinimumWidth(300)
+        self.setMinimumWidth(350)
         self.layout = QFormLayout(self)
 
         self.fname_input = QLineEdit()
         self.lname_input = QLineEdit()
         self.class_combo = QComboBox()
 
+        # Нові поля: дата народження та фото
+        self.birth_date = QDateEdit()
+        self.birth_date.setCalendarPopup(True)
+        self.birth_date.setDate(QDate(2010, 1, 1))
+
+        self.photo_path = None
+        from PyQt5.QtWidgets import QFileDialog
+        self.photo_btn = QPushButton("Обрати фото...")
+        self.photo_btn.clicked.connect(self.select_photo)
+        self.photo_label = QLabel("Фото не обрано")
+
         self.load_classes()
 
         self.layout.addRow("Ім'я:", self.fname_input)
         self.layout.addRow("Прізвище:", self.lname_input)
+        self.layout.addRow("Дата народж.:", self.birth_date)
         self.layout.addRow("Клас:", self.class_combo)
+        self.layout.addRow(self.photo_btn, self.photo_label)
 
         self.save_btn = QPushButton("Зберегти")
         self.save_btn.clicked.connect(self.save_data)
@@ -135,10 +149,19 @@ class StudentDialog(QDialog):
             for row in conn.execute("SELECT id, name FROM CLASSES"):
                 self.class_combo.addItem(row[1], row[0])
 
+    def select_photo(self):
+        from PyQt5.QtWidgets import QFileDialog
+        import os
+        path, _ = QFileDialog.getOpenFileName(self, "Обрати фото", "", "Images (*.png *.jpg *.jpeg)")
+        if path:
+            self.photo_path = path
+            self.photo_label.setText(os.path.basename(path))
+
     def load_data(self):
         with sqlite3.connect(auth.DB_PATH) as conn:
             cur = conn.cursor()
-            cur.execute("SELECT first_name, last_name, class_id FROM STUDENTS WHERE id=?", (self.student_id,))
+            cur.execute("SELECT first_name, last_name, class_id, birth_date, photo_path FROM STUDENTS WHERE id=?",
+                        (self.student_id,))
             row = cur.fetchone()
             if row:
                 self.fname_input.setText(row[0])
@@ -146,23 +169,46 @@ class StudentDialog(QDialog):
                 if row[2]:
                     index = self.class_combo.findData(row[2])
                     self.class_combo.setCurrentIndex(index)
+                if row[3]:
+                    self.birth_date.setDate(QDate.fromString(row[3], "yyyy-MM-dd"))
+                if row[4]:
+                    self.photo_label.setText("✅ Фото завантажено")
 
     def save_data(self):
         fname = self.fname_input.text().strip()
         lname = self.lname_input.text().strip()
         class_id = self.class_combo.currentData()
+        bdate = self.birth_date.date().toString("yyyy-MM-dd")
 
         if not fname or not lname:
             QMessageBox.warning(self, "Помилка", "Заповніть ім'я та прізвище")
             return
 
+        import shutil
+        from datetime import datetime
+        import os
+
+        saved_photo = None
+        if self.photo_path:
+            ext = os.path.splitext(self.photo_path)[1]
+            saved_photo = f"photo_{int(datetime.now().timestamp())}{ext}"
+            dest_path = os.path.join(auth.BASE_DIR, 'data', 'documents', saved_photo)
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            shutil.copy(self.photo_path, dest_path)
+
         with sqlite3.connect(auth.DB_PATH) as conn:
             if self.student_id:
-                conn.execute("UPDATE STUDENTS SET first_name=?, last_name=?, class_id=? WHERE id=?",
-                             (fname, lname, class_id, self.student_id))
+                if saved_photo:
+                    conn.execute(
+                        "UPDATE STUDENTS SET first_name=?, last_name=?, class_id=?, birth_date=?, photo_path=? WHERE id=?",
+                        (fname, lname, class_id, bdate, saved_photo, self.student_id))
+                else:
+                    conn.execute("UPDATE STUDENTS SET first_name=?, last_name=?, class_id=?, birth_date=? WHERE id=?",
+                                 (fname, lname, class_id, bdate, self.student_id))
             else:
-                conn.execute("INSERT INTO STUDENTS (first_name, last_name, class_id, is_active) VALUES (?, ?, ?, 1)",
-                             (fname, lname, class_id))
+                conn.execute(
+                    "INSERT INTO STUDENTS (first_name, last_name, class_id, birth_date, photo_path, is_active) VALUES (?, ?, ?, ?, ?, 1)",
+                    (fname, lname, class_id, bdate, saved_photo))
             conn.commit()
         self.accept()
 
