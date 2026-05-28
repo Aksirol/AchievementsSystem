@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import platform
 from datetime import datetime
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QComboBox, QFileDialog,
@@ -14,17 +15,23 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# КРИТ-1: Надійний пошук шрифтів (з підтримкою Debian)
+# КРИТ-1: Кросплатформний розумний пошук шрифту
 PROJECT_FONT_PATH = os.path.join(auth.BASE_DIR, 'fonts', 'arial.ttf')
-DEBIAN_FONT_PATH = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+
+if platform.system() == 'Windows':
+    OS_FONT_PATH = 'C:\\Windows\\Fonts\\arial.ttf'
+elif platform.system() == 'Darwin': # macOS
+    OS_FONT_PATH = '/Library/Fonts/Arial.ttf'
+else: # Linux / Debian
+    OS_FONT_PATH = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 
 try:
     if os.path.exists(PROJECT_FONT_PATH):
         pdfmetrics.registerFont(TTFont('CyrillicFont', PROJECT_FONT_PATH))
-    elif os.path.exists(DEBIAN_FONT_PATH):
-        pdfmetrics.registerFont(TTFont('CyrillicFont', DEBIAN_FONT_PATH))
+    elif os.path.exists(OS_FONT_PATH):
+        pdfmetrics.registerFont(TTFont('CyrillicFont', OS_FONT_PATH))
     else:
-        raise FileNotFoundError("Жодного шрифту з підтримкою кирилиці не знайдено.")
+        raise FileNotFoundError("Шрифт не знайдено.")
     BASE_FONT = 'CyrillicFont'
 except Exception as e:
     print(f"Увага: {e} Кирилиця не відображатиметься у PDF.")
@@ -42,17 +49,15 @@ class ReportsPanel(QWidget):
         self.init_class_tab()
         self.init_student_tab()
 
-        # ДОДАЙ ОСЬ ЦЕЙ РЯДОК СЮДИ:
         self.load_filters()
 
     def init_class_tab(self):
-        """Вкладка 1: Рейтинг та Звіт класу"""
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # Фільтри
         filter_layout = QHBoxLayout()
         self.rep_year_combo = QComboBox()
+        self.rep_year_combo.currentIndexChanged.connect(self.load_class_ranking) # K1/K3 виправлення
         self.rep_class_combo = QComboBox()
         self.rep_class_combo.currentIndexChanged.connect(self.load_class_ranking)
 
@@ -63,14 +68,12 @@ class ReportsPanel(QWidget):
         filter_layout.addStretch()
         layout.addLayout(filter_layout)
 
-        # Таблиця рейтингу
         self.ranking_table = QTableWidget()
         self.ranking_table.setColumnCount(3)
         self.ranking_table.setHorizontalHeaderLabels(["Учень", "Кількість досягнень", "Бали (Рейтинг)"])
         self.ranking_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.ranking_table)
 
-        # Кнопка експорту
         self.export_class_btn = QPushButton("Експортувати звіт класу (PDF)")
         self.export_class_btn.clicked.connect(self.export_class_report)
         layout.addWidget(self.export_class_btn)
@@ -78,7 +81,6 @@ class ReportsPanel(QWidget):
         self.tabs.addTab(tab, "Звіт та Рейтинг класу")
 
     def init_student_tab(self):
-        """Вкладка 2: Характеристика учня"""
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
@@ -105,11 +107,14 @@ class ReportsPanel(QWidget):
         with sqlite3.connect(auth.DB_PATH) as conn:
             self.rep_class_combo.clear()
             self.char_class_combo.clear()
+            self.rep_class_combo.addItem("Оберіть клас...", None)
+            self.char_class_combo.addItem("Оберіть клас...", None)
             for row in conn.execute("SELECT id, name FROM CLASSES"):
                 self.rep_class_combo.addItem(row[1], row[0])
                 self.char_class_combo.addItem(row[1], row[0])
 
             self.rep_year_combo.clear()
+            self.rep_year_combo.addItem("За весь час", None)
             for row in conn.execute("SELECT id, name FROM ACADEMIC_YEARS"):
                 self.rep_year_combo.addItem(row[1], row[0])
 
@@ -124,22 +129,30 @@ class ReportsPanel(QWidget):
 
     def load_class_ranking(self):
         class_id = self.rep_class_combo.currentData()
-        if not class_id: return
+        year_id = self.rep_year_combo.currentData()
+        if not class_id:
+            self.ranking_table.setRowCount(0)
+            return
 
-        # Обчислення рейтингу (кількість досягнень + умовні бали за місця)
+        # K1/K3 виправлення: обчислюємо бали тільки за обраний навчальний рік, але показуємо всіх учнів
         query = """
             SELECT s.last_name || ' ' || s.first_name,
-                   COUNT(a.id) as ach_count,
-                   SUM(CASE WHEN a.place = 1 THEN 3 WHEN a.place = 2 THEN 2 WHEN a.place = 3 THEN 1 ELSE 0.5 END) as points
+                   COUNT(filtered_a.id) as ach_count,
+                   SUM(CASE WHEN filtered_a.place = 1 THEN 3 WHEN filtered_a.place = 2 THEN 2 WHEN filtered_a.place = 3 THEN 1 ELSE 0.5 END) as points
             FROM STUDENTS s
-            LEFT JOIN ACHIEVEMENTS a ON s.id = a.student_id
+            LEFT JOIN (
+                SELECT a.id, a.student_id, a.place 
+                FROM ACHIEVEMENTS a 
+                JOIN EVENTS e ON a.event_id = e.id 
+                WHERE e.academic_year_id = ? OR ? IS NULL
+            ) filtered_a ON s.id = filtered_a.student_id
             WHERE s.class_id = ?
             GROUP BY s.id
             ORDER BY points DESC, ach_count DESC
         """
         with sqlite3.connect(auth.DB_PATH) as conn:
             cur = conn.cursor()
-            cur.execute(query, (class_id,))
+            cur.execute(query, (year_id, year_id, class_id))
             rows = cur.fetchall()
 
         self.ranking_table.setRowCount(len(rows))
@@ -150,14 +163,13 @@ class ReportsPanel(QWidget):
 
     def export_class_report(self):
         class_name = self.rep_class_combo.currentText()
-        if not class_name: return
+        if not self.rep_class_combo.currentData(): return
 
         path, _ = QFileDialog.getSaveFileName(self, "Зберегти звіт", f"Звіт_класу_{class_name}.pdf", "PDF (*.pdf)")
         if not path: return
 
         doc = SimpleDocTemplate(path, pagesize=A4)
         elements = []
-        styles = getSampleStyleSheet()
         title_style = ParagraphStyle('TitleCyrillic', fontName=BASE_FONT, fontSize=16, alignment=1, spaceAfter=20)
 
         elements.append(Paragraph(f"Зведений звіт досягнень класу: {class_name}", title_style))
@@ -194,7 +206,6 @@ class ReportsPanel(QWidget):
                                               f"Характеристика_{student_name.replace(' ', '_')}.pdf", "PDF (*.pdf)")
         if not path: return
 
-        # Збір даних для характеристики
         with sqlite3.connect(auth.DB_PATH) as conn:
             cur = conn.cursor()
             cur.execute("SELECT c.name FROM CLUBS c JOIN CLUB_MEMBERS cm ON c.id = cm.club_id WHERE cm.student_id = ?",
@@ -206,15 +217,12 @@ class ReportsPanel(QWidget):
                 (student_id,))
             achievements = cur.fetchall()
 
-            # Запис в історію експорту (PORTFOLIO_EXPORTS)
             user_id = auth.Session.current_user['id']
             cur.execute("INSERT INTO PORTFOLIO_EXPORTS (student_id, file_path, created_by) VALUES (?, ?, ?)",
-                        (student_id, path, user_id))
+                        (student_id, os.path.basename(path), user_id))
             conn.commit()
 
-        # Формування PDF
         doc = SimpleDocTemplate(path, pagesize=A4)
-        styles = getSampleStyleSheet()
         normal_style = ParagraphStyle('NormalCyrillic', fontName=BASE_FONT, fontSize=12, spaceAfter=10)
         title_style = ParagraphStyle('TitleCyrillic', fontName=BASE_FONT, fontSize=16, alignment=1, spaceAfter=20)
 

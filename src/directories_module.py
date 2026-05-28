@@ -4,8 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                              QMessageBox, QDialog, QHeaderView, QTabWidget, QInputDialog)
 import auth
 
-
-# --- Діалог Додавання/Редагування Вчителя ---
+# --- Діалог Додавання/Редагування Вчителя залишається без змін ---
 class TeacherDialog(QDialog):
     def __init__(self, teacher_id=None, parent=None):
         super().__init__(parent)
@@ -62,7 +61,6 @@ class TeacherDialog(QDialog):
             conn.commit()
         self.accept()
 
-
 # --- Головна панель Довідників ---
 class DirectoriesPanel(QWidget):
     def __init__(self):
@@ -84,9 +82,12 @@ class DirectoriesPanel(QWidget):
         self.add_teacher_btn.clicked.connect(self.add_teacher)
         self.edit_teacher_btn = QPushButton("Редагувати")
         self.edit_teacher_btn.clicked.connect(self.edit_teacher)
+        self.del_teacher_btn = QPushButton("Видалити")
+        self.del_teacher_btn.clicked.connect(self.delete_teacher)
 
         btn_layout.addWidget(self.add_teacher_btn)
         btn_layout.addWidget(self.edit_teacher_btn)
+        btn_layout.addWidget(self.del_teacher_btn)
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
@@ -107,8 +108,14 @@ class DirectoriesPanel(QWidget):
         btn_layout = QHBoxLayout()
         self.add_subject_btn = QPushButton("Додати предмет")
         self.add_subject_btn.clicked.connect(self.add_subject)
+        self.edit_subject_btn = QPushButton("Редагувати")
+        self.edit_subject_btn.clicked.connect(self.edit_subject)
+        self.del_subject_btn = QPushButton("Видалити")
+        self.del_subject_btn.clicked.connect(self.delete_subject)
 
         btn_layout.addWidget(self.add_subject_btn)
+        btn_layout.addWidget(self.edit_subject_btn)
+        btn_layout.addWidget(self.del_subject_btn)
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
@@ -144,6 +151,18 @@ class DirectoriesPanel(QWidget):
         if TeacherDialog(teacher_id, parent=self).exec_():
             self.load_teachers()
 
+    def delete_teacher(self):
+        row = self.teachers_table.currentRow()
+        if row < 0: return
+        t_id = self.teachers_table.item(row, 0).text()
+        name = self.teachers_table.item(row, 1).text()
+        reply = QMessageBox.question(self, "Підтвердження", f"Видалити вчителя {name}?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            with sqlite3.connect(auth.DB_PATH) as conn:
+                conn.execute("DELETE FROM TEACHERS WHERE id=?", (t_id,))
+                conn.commit()
+            self.load_teachers()
+
     def load_subjects(self):
         with sqlite3.connect(auth.DB_PATH) as conn:
             cur = conn.cursor()
@@ -160,5 +179,29 @@ class DirectoriesPanel(QWidget):
         if ok and name.strip():
             with sqlite3.connect(auth.DB_PATH) as conn:
                 conn.execute("INSERT INTO SUBJECTS (name) VALUES (?)", (name.strip(),))
+                conn.commit()
+            self.load_subjects()
+
+    def edit_subject(self):
+        row = self.subjects_table.currentRow()
+        if row < 0: return
+        s_id = self.subjects_table.item(row, 0).text()
+        current_name = self.subjects_table.item(row, 1).text()
+        name, ok = QInputDialog.getText(self, "Редагувати предмет", "Назва предмету:", QLineEdit.Normal, current_name)
+        if ok and name.strip():
+            with sqlite3.connect(auth.DB_PATH) as conn:
+                conn.execute("UPDATE SUBJECTS SET name=? WHERE id=?", (name.strip(), s_id))
+                conn.commit()
+            self.load_subjects()
+
+    def delete_subject(self):
+        row = self.subjects_table.currentRow()
+        if row < 0: return
+        s_id = self.subjects_table.item(row, 0).text()
+        name = self.subjects_table.item(row, 1).text()
+        reply = QMessageBox.question(self, "Підтвердження", f"Видалити предмет {name}?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            with sqlite3.connect(auth.DB_PATH) as conn:
+                conn.execute("DELETE FROM SUBJECTS WHERE id=?", (s_id,))
                 conn.commit()
             self.load_subjects()

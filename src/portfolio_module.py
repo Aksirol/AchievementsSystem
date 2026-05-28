@@ -74,6 +74,32 @@ class PortfolioPanel(QWidget):
 
     def load_classes(self):
         self.class_combo.clear()
+
+        # Безпека для ролі «Учень / Батьки»
+        if auth.Session.current_user['role'] == "Учень / Батьки":
+            username = auth.Session.current_user['username']
+            with sqlite3.connect(auth.DB_PATH) as conn:
+                cur = conn.cursor()
+                # Припускаємо, що логін учня дорівнює його прізвищу
+                cur.execute("SELECT class_id, id, last_name || ' ' || first_name FROM STUDENTS WHERE last_name = ?",
+                            (username,))
+                row = cur.fetchone()
+                if row:
+                    class_id, st_id, st_name = row
+                    self.class_combo.addItem("Ваш клас", class_id)
+                    self.student_combo.clear()
+                    self.student_combo.addItem(st_name, st_id)
+                    self.class_combo.setEnabled(False)
+                    self.student_combo.setEnabled(False)
+                    self.load_portfolio()
+                else:
+                    self.class_combo.addItem("Доступ закрито", None)
+                    self.class_combo.setEnabled(False)
+                    self.student_combo.setEnabled(False)
+                    QMessageBox.warning(self, "Увага",
+                                        f"Ваш логін '{username}' не співпадає з прізвищем жодного учня. Зверніться до адміністратора для налаштування доступу.")
+            return
+
         self.class_combo.addItem("Оберіть клас...", None)
         with sqlite3.connect(auth.DB_PATH) as conn:
             for row in conn.execute("SELECT id, name FROM CLASSES ORDER BY grade_number, name"):

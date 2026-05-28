@@ -279,9 +279,11 @@ class AchievementsPanel(QWidget):
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply == QMessageBox.Yes:
-            # TC-4.6: Видалення з БД та з диска
+            user_id = auth.Session.current_user['id']
             with sqlite3.connect(auth.DB_PATH) as conn:
                 conn.execute("DELETE FROM ACHIEVEMENTS WHERE id=?", (ach_id,))
+                conn.execute("INSERT INTO BACKUP_LOG (file_path, created_by, status) VALUES (?, ?, ?)",
+                             (f"Видалення досягнення ID:{ach_id}", user_id, "Видалення досягнення"))
                 conn.commit()
 
             if doc_path:

@@ -1,4 +1,6 @@
 import sys
+import sqlite3
+import auth
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QVBoxLayout, QHBoxLayout,
                              QWidget, QPushButton, QStackedWidget, QDialog, QListWidget)
 from PyQt5.QtCore import Qt
@@ -13,6 +15,13 @@ from reports_module import ReportsPanel
 from backup_module import BackupPanel
 from directories_module import DirectoriesPanel
 from portfolio_module import PortfolioPanel
+
+
+def enforce_db_constraints():
+    """Створює унікальні індекси на рівні бази даних для захисту цілісності."""
+    with sqlite3.connect(auth.DB_PATH) as conn:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_student_event ON ACHIEVEMENTS(student_id, event_id);")
+        conn.commit()
 
 
 class MainWindow(QMainWindow):
@@ -124,8 +133,9 @@ def show_login_and_start():
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    # Перед запуском перевіряємо, чи є хоча б один адмін
+    # Перед запуском
     create_default_admin()
+    enforce_db_constraints() # <--- Виклик захисту
 
     show_login_and_start()
     sys.exit(app.exec_())
